@@ -57,6 +57,7 @@ function DocView:new(doc)
   self.font = "code_font"
   self.last_x_offset = {}
   self.blink_timer = 0
+  self.blink_show = true
 end
 
 
@@ -208,6 +209,7 @@ function DocView:on_mouse_pressed(button, x, y, clicks)
     self.mouse_selecting = true
   end
   self.blink_timer = 0
+  self.blink_show = true
 end
 
 
@@ -250,17 +252,35 @@ function DocView:update()
     self.last_line, self.last_col = line, col
   end
 
-  -- update blink timer
-  if self == core.active_view and not self.mouse_selecting then
-    local n = blink_period / 2
-    local prev = self.blink_timer
-    self.blink_timer = (self.blink_timer + 1 / config.fps) % blink_period
-    if (self.blink_timer > n) ~= (prev > n) then
+  local wait = nil
+  if not system.window_has_focus() then
+    if self.blink_show then
+      self.blink_timer = 0
+      self.blink_show = false
       core.redraw = true
+    end
+  else
+    -- update blink timer
+    if self == core.active_view and not self.mouse_selecting then
+      local cur_time = system.get_time()
+      local half_blink = blink_period / 2
+      if self.blink_timer == 0 then
+        self.blink_timer = cur_time
+        self.blink_show = true
+      end
+
+      local blink_elapsed = (cur_time - self.blink_timer)
+      local blink_show = math.floor(blink_elapsed / half_blink)
+      if blink_show % 2 == 0 ~= self.blink_show then
+        core.redraw = true
+        self.blink_show = blink_show % 2 == 0
+      end
+      wait = cur_time + (half_blink - (blink_elapsed % half_blink))
     end
   end
 
   DocView.super.update(self)
+  return wait
 end
 
 
@@ -305,8 +325,9 @@ function DocView:draw_line_body(idx, x, y)
   self:draw_line_text(idx, x, y)
 
   -- draw caret if it overlaps this line
+
   if line == idx and core.active_view == self
-  and self.blink_timer < blink_period / 2
+  and self.blink_show
   and system.window_has_focus() then
     local lh = self:get_line_height()
     local x1 = x + self:get_col_x_offset(line, col)

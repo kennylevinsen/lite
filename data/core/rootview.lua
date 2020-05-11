@@ -303,14 +303,27 @@ end
 
 
 function Node:update()
+  local wait = nil
+
   if self.type == "leaf" then
     for _, view in ipairs(self.views) do
-      view:update()
+      local view_wait = view:update()
+      if view_wait ~= nil and (wait == nil or view_wait < wait) then
+        wait = view_wait
+      end
     end
   else
-    self.a:update()
-    self.b:update()
+    local wait_a = self.a:update()
+    local wait_b = self.b:update()
+
+    if wait_b == nil or (wait_a ~= nil and wait_a < wait_b) then
+      wait = wait_a
+    else
+      wait = wait_b
+    end
   end
+
+  return wait
 end
 
 
@@ -470,8 +483,9 @@ end
 
 function RootView:update()
   copy_position_and_size(self.root_node, self)
-  self.root_node:update()
+  local wait = self.root_node:update()
   self.root_node:update_layout()
+  return wait
 end
 
 

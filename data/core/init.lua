@@ -21,13 +21,11 @@ local function project_scan_thread()
       end
     end
   end
-
   local function compare_file(a, b)
     return a.filename < b.filename
   end
 
   local function get_files(path, t)
-    coroutine.yield()
     t = t or {}
     local size_limit = config.file_size_limit * 10e5
     local all = system.list_dir(path) or {}
@@ -346,12 +344,12 @@ function core.step()
 
   -- update
   core.root_view.size.x, core.root_view.size.y = width, height
-  core.root_view:update()
-  if not core.redraw then
-    if not system.window_has_focus() then system.wait_event(0.5) end
-    return
-  end
-  core.redraw = false
+  local wait = core.root_view:update()
+  return wait
+end
+
+function core.draw()
+  local width, height = renderer.get_size()
 
   -- close unreferenced docs
   for i = #core.docs, 1, -1 do
@@ -382,11 +380,11 @@ end
 local run_threads = coroutine.wrap(function()
   while true do
     local max_time = 1 / config.fps - 0.004
-    local ran_any_threads = false
+    local wait = nil
 
     for k, thread in pairs(core.threads) do
       -- run thread
-      if thread.wake < system.get_time() then
+      if thread.wake == nil or thread.wake < system.get_time() then
         local _, wait = assert(coroutine.resume(thread.cr))
         if coroutine.status(thread.cr) == "dead" then
           if type(k) == "number" then
@@ -396,28 +394,56 @@ local run_threads = coroutine.wrap(function()
           end
         elseif wait then
           thread.wake = system.get_time() + wait
+        else
+          thread.wake = nil
         end
-        ran_any_threads = true
+
+        if thread.wake ~= nil and (wait == nil or thread.wake < wait) then
+          wait = thread.wake
+        end
       end
 
       -- stop running threads if we're about to hit the end of frame
       if system.get_time() - core.frame_start > max_time then
-        coroutine.yield()
+        coroutine.yield(system.get_time())
       end
     end
 
-    if not ran_any_threads then coroutine.yield() end
+    coroutine.yield(wait)
   end
 end)
 
 
 function core.run()
+  local stepcnt = 0
   while true do
+    stepcnt = stepcnt + 1
     core.frame_start = system.get_time()
-    core.step()
-    run_threads()
-    local elapsed = system.get_time() - core.frame_start
-    system.sleep(math.max(0, 1 / config.fps - elapsed))
+    local wait = core.step()
+    local thread_wait = run_threads()
+
+    if core.redraw then
+      core.draw()
+      core.redraw = false
+      -- We're drawing, fire again at the set fps rate
+      -- TODO: We should be waiting for presentation to minimize tearing.
+      local cur_time = system.get_time()
+      local elapsed = cur_time - core.frame_start
+      wait = cur_time + math.max(0, 1 / config.fps - elapsed)
+    elseif thread_wait ~= nil and (wait == nil or thread_wait < wait) then
+      wait = thread_wait
+    end
+
+    if wait == nil then
+      wait = 15
+    else
+      wait = wait - system.get_time()
+    end
+
+    print(stepcnt, "Ran", wait)
+    if wait > 0 then
+      system.wait_event(wait)
+    end
   end
 end
 

@@ -61,7 +61,7 @@ core.add_thread(function()
     -- wait for next scan
     local valid = true
     while valid do
-      coroutine.yield(1)
+      coroutine.yield()
       for _, doc in ipairs(core.docs) do
         if not cache_is_valid(doc) then
           valid = false
@@ -178,7 +178,7 @@ end
 
 
 RootView.update = function(...)
-  update(...)
+  local wait = update(...)
 
   local av = get_active_view()
   if av then
@@ -188,6 +188,8 @@ RootView.update = function(...)
       reset_suggestions()
     end
   end
+
+  return wait
 end
 
 

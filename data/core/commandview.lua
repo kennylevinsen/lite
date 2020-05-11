@@ -160,7 +160,7 @@ end
 
 
 function CommandView:update()
-  CommandView.super.update(self)
+  local wait = CommandView.super.update(self)
 
   if core.active_view ~= self and self.state ~= default_state then
     self:exit(false, true)
@@ -198,6 +198,8 @@ function CommandView:update()
     dest = style.font:get_height() + style.padding.y * 2
   end
   self:move_towards(self.size, "y", dest)
+
+  return wait
 end
 
 
