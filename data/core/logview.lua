@@ -29,7 +29,7 @@ function LogView:update()
 
   self:move_towards("yoffset", 0)
 
-  LogView.super.update(self)
+  return LogView.super.update(self)
 end
 
 

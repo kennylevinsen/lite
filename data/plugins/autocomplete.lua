@@ -61,7 +61,7 @@ core.add_thread(function()
     -- wait for next scan
     local valid = true
     while valid do
-      coroutine.yield(1)
+      coroutine.yield(10)
       for _, doc in ipairs(core.docs) do
         if not cache_is_valid(doc) then
           valid = false

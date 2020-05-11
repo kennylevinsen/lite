@@ -27,21 +27,21 @@ local function reload_doc(doc)
 end
 
 
-core.add_thread(function()
-  while true do
-    -- check all doc modified times
-    for _, doc in ipairs(core.docs) do
-      local info = system.get_file_info(doc.filename or "")
-      if info and times[doc] ~= info.modified then
-        reload_doc(doc)
-      end
-      coroutine.yield()
-    end
+--core.add_thread(function()
+--  while true do
+--    -- check all doc modified times
+--    for _, doc in ipairs(core.docs) do
+--      local info = system.get_file_info(doc.filename or "")
+ --     if info and times[doc] ~= info.modified then
+--        reload_doc(doc)
+--      end
+--      coroutine.yield()
+--    end
 
     -- wait for next scan
-    coroutine.yield(config.project_scan_rate)
-  end
-end)
+--    coroutine.yield(config.project_scan_rate)
+--  end
+--end)
 
 
 -- patch `Doc.save|load` to store modified time

@@ -32,13 +32,21 @@ end
 function StatusView:update()
   self.size.y = style.font:get_height() + style.padding.y * 2
 
-  if system.get_time() < self.message_timeout then
+  local wait = nil
+  local time = system.get_time()
+  if time < self.message_timeout then
     self.scroll.to.y = self.size.y
+    wait = self.message_timeout - time
   else
     self.scroll.to.y = 0
   end
 
-  StatusView.super.update(self)
+  local super_wait = StatusView.super.update(self)
+  if type(super_wait) == "number" and (type(wait) ~= "number" or super_wait < wait) then
+    return super_wait
+  end
+
+  return wait
 end
 
 

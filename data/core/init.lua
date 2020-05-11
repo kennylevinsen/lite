@@ -21,7 +21,6 @@ local function project_scan_thread()
       end
     end
   end
-
   local function compare_file(a, b)
     return a.filename < b.filename
   end
@@ -336,22 +335,22 @@ function core.step()
       local _, res = core.try(core.on_event, type, a, b, c, d)
       did_keymap = res or did_keymap
     end
-    core.redraw = true
+     core.redraw = true
   end
   if mouse_moved then
     core.try(core.on_event, "mousemoved", mouse.x, mouse.y, mouse.dx, mouse.dy)
   end
 
   local width, height = renderer.get_size()
-
   -- update
   core.root_view.size.x, core.root_view.size.y = width, height
-  core.root_view:update()
-  if not core.redraw then
-    if not system.window_has_focus() then system.wait_event(0.5) end
-    return
-  end
-  core.redraw = false
+  local wait = core.root_view:update()
+  print("View update time", wait)
+  return wait
+end
+
+function core.draw()
+  local width, height = renderer.get_size()
 
   -- close unreferenced docs
   for i = #core.docs, 1, -1 do
@@ -397,6 +396,7 @@ local run_threads = coroutine.wrap(function()
         elseif wait then
           thread.wake = system.get_time() + wait
         end
+
         ran_any_threads = true
       end
 
@@ -414,10 +414,31 @@ end)
 function core.run()
   while true do
     core.frame_start = system.get_time()
-    core.step()
+    local wait = core.step()
     run_threads()
     local elapsed = system.get_time() - core.frame_start
-    system.sleep(math.max(0, 1 / config.fps - elapsed))
+    if core.redraw then
+      core.draw()
+      core.redraw = false
+      -- TODO: We should be waiting for presentation to minimize tearing.
+      system.sleep(math.max(0, 1 / config.fps - elapsed))
+    else
+      local cur_time = system.get_time()
+      if type(wait) ~= "number" then
+        wait = cur_time + 60
+      end
+
+      for k, thread in pairs(core.threads) do
+        if thread.wake < wait then
+           wait = thread.wake
+        end
+      end
+      wait = wait - cur_time
+      if wait > 0 then
+        print("Sleep", wait)
+        system.wait_event(wait)
+      end
+    end
   end
 end
 
